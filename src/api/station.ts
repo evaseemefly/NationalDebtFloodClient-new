@@ -291,6 +291,21 @@ const loadStaionRegionCountry = (code: string) => {
 	})
 }
 
+/**
+ * + 25-06-24 获取指定站点的潮位组增水集合
+ * @param stationCode
+ * @param tyCode
+ * @param issueTs
+ * @returns
+ */
+const loadTargetStationGroupSurgeList = (stationCode: string, tyCode: string, issueTs: number) => {
+	const url = `${host}${area}/surge/group/`
+	return axios.get(url, {
+		headers: authHeader(),
+		params: { station_code: stationCode, ty_code: tyCode, issue_ts: issueTs },
+	})
+}
+
 export {
 	loadStationDetailDataList,
 	loadStationExtremumDataList,
@@ -307,4 +322,5 @@ export {
 	loadAllStationLastSurge,
 	loadInlandStationMaxSurge,
 	loadDistStationsAlertLevelList,
+	loadTargetStationGroupSurgeList,
 }

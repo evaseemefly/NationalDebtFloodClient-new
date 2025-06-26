@@ -7,6 +7,7 @@ import {
 	GET_TY_GROUP_PATH,
 	SET_TY_GROUP_PATH,
 } from './../types'
+import { DEFAULT_TIMESTAMP, DEFAULT_TY_CODE } from '@/const/default'
 
 export interface ITyphoon {
 	/** 台风路径 */
@@ -26,8 +27,8 @@ export interface ITyphoon {
 const state: ITyphoon = {
 	tyPathList: [],
 	tyGroup: {
-		tyCode: '',
-		timeStamp: 0,
+		tyCode: DEFAULT_TY_CODE,
+		timeStamp: DEFAULT_TIMESTAMP,
 	},
 	tyGroupPath: null,
 }

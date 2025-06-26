@@ -118,6 +118,7 @@ import {
 	GET_TY_GROUP_PATH,
 	GET_FLOOD_PLAIN_SHOW_TRIGGER,
 	GET_FLOOD_RISK_LEVEL,
+	SET_TYPHOON_CODE,
 } from '@/store/types'
 // 默认常量
 import {
@@ -359,7 +360,9 @@ export default class GlobalForecastMapView extends Vue {
 		const that = this
 
 		const mymap: L.Map = this.$refs.basemap['mapObject']
-
+		const tyCode = '2106'
+		this.setShowStationSurgeForm(false)
+		this.setTyphoonCode(tyCode)
 		this.getAllStations(mymap)
 		// TODO:[*] 25-06-04 测试加载淹没栅格图层
 		// this.addFloodPlainRasterLayer(mymap)
@@ -396,8 +399,8 @@ export default class GlobalForecastMapView extends Vue {
 					(item) =>
 						new StationBaseInfoMidModel(
 							-1,
-							item.station_name,
 							item.station_code,
+							item.station_name,
 							item.lat,
 							item.lon
 						)
@@ -422,6 +425,8 @@ export default class GlobalForecastMapView extends Vue {
 				// 在地图中加载潮位站
 				addFixedIconsLayer(map, allStationIcons, (msg: { code: string; name: string }) => {
 					console.log(`当前点击了code:${msg.code},name:${msg.name}`)
+					this.setStationCode(msg.code)
+					this.setShowStationSurgeForm(true)
 				})
 			})
 			.catch((err) => {
@@ -502,6 +507,8 @@ export default class GlobalForecastMapView extends Vue {
 
 	/** 设置当前潮位站 code */
 	@Mutation(SET_STATION_CODE, { namespace: 'station' }) setStationCode
+
+	@Mutation(SET_TYPHOON_CODE, { namespace: 'typhoon' }) setTyphoonCode
 
 	/** 设置当前潮位站的坐标 */
 	@Mutation(SET_TARGET_POSITION_LATLNG, { namespace: 'station' }) setPositionLatlng
