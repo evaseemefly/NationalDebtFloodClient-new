@@ -22,3 +22,12 @@ export interface ITyGroupPathSurge {
 	group_type: number
 	surge_list: ISurgeItem[]
 }
+
+/**
+ * @description 天文潮数据接口
+ */
+export interface ITide {
+	station_code: string
+	ts: number
+	tide: number
+}

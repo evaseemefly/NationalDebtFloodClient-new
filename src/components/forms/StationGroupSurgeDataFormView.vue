@@ -9,6 +9,9 @@
 				<!-- TODO:[-] 25-06-26 由 DataFormView 组件中获取 groupPathSurgeList 数据 -->
 				<StationGroupSurgeChartView
 					:groupPathSurgeList="groupPathSurgeList"
+					:tideList="tideList"
+					:stationCode="getStationCode"
+					:isFinished="isFinished"
 				></StationGroupSurgeChartView>
 			</div>
 		</div>
@@ -23,10 +26,10 @@ import { GET_SHOW_STATION_SURGE_FORM, GET_STATION_CODE, GET_TY_GROUP } from '@/s
 import { ITyphoon } from '@/store/modules/typhoon'
 import { ITyGroupTip } from '@/interface/typhoon'
 import { DEFAULT_STATION_CODE, DEFAULT_TIMESTAMP, DEFAULT_TY_CODE } from '@/const/default'
-import { loadTargetStationGroupSurgeList } from '@/api/station'
+import { loadTargetStationGroupSurgeList, loadTargetStationTideList } from '@/api/station'
 import consola from 'consola'
 import { IHttpResponse } from '@/interface/common'
-import { ITyGroupPathSurge } from '@/interface/surge'
+import { ITide, ITyGroupPathSurge } from '@/interface/surge'
 import { TyphoonGroupTypeEnum } from '@/enum/typhoon'
 @Component({ components: { StationGroupSurgeChartView } })
 export default class StationGroupSurgeDataFormView extends Vue {
@@ -34,6 +37,69 @@ export default class StationGroupSurgeDataFormView extends Vue {
 
 	/** 集合路径增水集合 */
 	groupPathSurgeList: ITyGroupPathSurge[] = []
+
+	/** 天文潮预报集合 */
+	tideList: ITide[] = []
+
+	isFinished = false
+
+	/** + 25-06-30 加载指定站点的增水全集合(增水集合+天文潮集合) */
+	async loadTargetStationSurgeList(
+		stationCode: string,
+		tyCode: string,
+		issueTs: number
+	): Promise<void> {
+		this.isFinished = false // 设置 isFinished 为 false，表示加载未完成
+		try {
+			loadTargetStationGroupSurgeList(stationCode, tyCode, issueTs)
+				.then((res: IHttpResponse<ITyGroupPathSurge[]>) => {
+					// step1: 获取增水集合
+					if (res.status === 200 && res.data) {
+						this.groupPathSurgeList = res.data
+						return res.data
+					} else {
+						// 建议处理请求失败或数据为空的情况
+						consola.error(`加载数据失败或返回数据为空，状态码: ${res.status}`)
+						return [] // 清空旧数据，防止显示错误信息
+					}
+				})
+				.then((res) => {
+					// step2: 获取增水集合的起止时间
+					// res 是一个包含增水数据的数组
+					if (res.length === 0) {
+						consola.warn('未找到对应的增水数据，请检查站点或台风编号是否正确。')
+					} else {
+						// TODO:[-] 25-06-30 根据加载的增水集合，获取起止时间
+						const forecastTsList: number[] = res[0].surge_list.map((surge) => {
+							return surge.forecast_ts
+						})
+						const endTs = Math.max(...forecastTsList) // 获取增水集合的最大时间戳
+						const startTs = Math.min(...forecastTsList) // 获取增水集合的最小时间戳
+						return {
+							start: startTs,
+							end: endTs,
+						}
+					}
+				})
+				.then((timeRange) => {
+					// step3: 获取天文潮数据
+					if (timeRange) {
+						// 调用获取天文潮的函数
+						this.loadTargetStationAstronomicTideList(
+							stationCode,
+							timeRange.start,
+							timeRange.end
+						)
+					}
+				})
+				.finally(() => {
+					// step4: 设置 isFinished 为 true，表示加载完成
+					this.isFinished = true
+				})
+		} catch (error) {
+			consola.error('API请求异常:', error)
+		}
+	}
 
 	async loadTargetStationGroupSurgeList(stationCode: string, tyCode: string, issueTs: number) {
 		loadTargetStationGroupSurgeList(stationCode, tyCode, issueTs)
@@ -43,6 +109,7 @@ export default class StationGroupSurgeDataFormView extends Vue {
 					// 	`loadTargetStationGroupSurgeList 返回数据:${JSON.stringify(res.data)}`
 					// )
 					this.groupPathSurgeList = res.data
+					return res.data
 				} else {
 					// 建议处理请求失败或数据为空的情况
 					consola.error(`加载数据失败或返回数据为空，状态码: ${res.status}`)
@@ -56,14 +123,30 @@ export default class StationGroupSurgeDataFormView extends Vue {
 			})
 	}
 
-	/** +25-06-25
+	/** TODO:[*] 25-06-26
 	 * 加载指定时间范围的天文潮
 	 */
 	async loadTargetStationAstronomicTideList(
 		stationCode: string,
 		startTs: number,
 		endTs: number
-	): Promise<ITyGroupPathSurge[]> {}
+	): Promise<void> {
+		loadTargetStationTideList(stationCode, startTs, endTs)
+			.then((res: IHttpResponse<ITide[]>) => {
+				if (res.status === 200 && res.data) {
+					consola.log(
+						`loadTargetStationAstronomicTideList 返回数据:${JSON.stringify(res.data)}`
+					)
+					// 处理返回的数据
+					this.tideList = res.data
+				} else {
+					consola.error(`加载天文潮数据失败或返回数据为空，状态码: ${res.status}`)
+				}
+			})
+			.catch((error) => {
+				consola.error('API请求异常:', error)
+			})
+	}
 
 	/**
 	 * TODO:[*] 25-06-25
@@ -117,12 +200,16 @@ export default class StationGroupSurgeDataFormView extends Vue {
 				`Typhoon or Station Code changed:stationCode:${newVal.stationCode}, tyCode:${newVal.typhoon.tyCode}, timeStamp:${newVal.typhoon.timeStamp}`
 			)
 			// 调用api获取该站点的增水集合
-			this.loadTargetStationGroupSurgeList(
+			// this.loadTargetStationGroupSurgeList(
+			// 	newVal.stationCode,
+			// 	newVal.typhoon.tyCode,
+			// 	newVal.typhoon.timeStamp
+			// )
+			this.loadTargetStationSurgeList(
 				newVal.stationCode,
 				newVal.typhoon.tyCode,
 				newVal.typhoon.timeStamp
-			) // 调用api获取该站点的增水集合
-			// 调用api获取该站点的天文潮集合
+			)
 		}
 	}
 

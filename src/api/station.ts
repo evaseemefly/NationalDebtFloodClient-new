@@ -306,6 +306,21 @@ const loadTargetStationGroupSurgeList = (stationCode: string, tyCode: string, is
 	})
 }
 
+/**
+ * 获取指定站点的天文潮集合
+ * @param stationCode
+ * @param start_ts
+ * @param end_ts
+ * @returns
+ */
+const loadTargetStationTideList = (stationCode: string, start_ts: number, end_ts: number) => {
+	const url = `${host}${area}/tide/list/`
+	return axios.get(url, {
+		headers: authHeader(),
+		params: { station_code: stationCode, start_ts: start_ts, end_ts: end_ts },
+	})
+}
+
 export {
 	loadStationDetailDataList,
 	loadStationExtremumDataList,
@@ -323,4 +338,5 @@ export {
 	loadInlandStationMaxSurge,
 	loadDistStationsAlertLevelList,
 	loadTargetStationGroupSurgeList,
+	loadTargetStationTideList,
 }

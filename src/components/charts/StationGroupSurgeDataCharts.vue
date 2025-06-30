@@ -8,7 +8,7 @@
 	>
 		<div class="left-section">
 			<div class="info-card base-info">
-				<h3>{{ getStationCode }} 站</h3>
+				<h3>{{ stationCode }} 站</h3>
 				<div>
 					<div class="row"><span>所属国家_en</span><span>-</span></div>
 					<div class="row"><span>所属区域_en</span><span>-</span></div>
@@ -105,7 +105,7 @@ import { loadWaveProductForecastRealDataList } from '@/api/wave'
 import { filter } from 'vue/types/umd'
 import { faL } from '@fortawesome/free-solid-svg-icons'
 import consola from 'consola'
-import { ITyGroupPathSurge } from '@/interface/surge'
+import { ITide, ITyGroupPathSurge } from '@/interface/surge'
 import { MS_UNIT } from '@/const/unit'
 import { getTyGroupEnumName } from '@/enum/typhoon'
 
@@ -138,8 +138,6 @@ export default class StationGroupSurgeChartView extends Vue {
 	dtList: Date[] = []
 	/** 实况潮位 */
 	surgeList: number[] = []
-	/** 天文潮 */
-	tideList: number[] = []
 	/** 实况潮位-天文潮 */
 	diffSurgeList: number[] = []
 	/** 预报值列表 */
@@ -154,16 +152,25 @@ export default class StationGroupSurgeChartView extends Vue {
 	chartSubTitle = '--'
 
 	seriesMap: Map<string, string> = new Map([
-		['总潮位', '总潮位'],
-		['实况增水值', '实况增水值'],
+		['中心路径', '中心路径'],
+		['慢速路径', '慢速路径'],
+		['快速路径', '快速路径'],
+		['右侧路径', '右侧路径'],
+		['左侧路径', '左侧路径'],
 		['天文潮', '天文潮'],
-		['预报增水值', '预报增水值'],
 	])
+
+	@Prop({ type: Boolean, default: false })
+	readonly isFinished: boolean
 
 	@Prop({ type: Array, default: () => [] })
 	readonly groupPathSurgeList: ITyGroupPathSurge[]
 
-	stationCode = DEFAULT_STATION_CODE
+	@Prop({ type: Array, default: () => [] })
+	readonly tideList: ITide[]
+
+	@Prop({ type: String, default: DEFAULT_STATION_CODE })
+	readonly stationCode: string
 
 	tyCode = DEFAULT_TY_CODE
 
@@ -173,29 +180,43 @@ export default class StationGroupSurgeChartView extends Vue {
 	created() {}
 
 	// 监听 prop 变化
-	@Watch('groupPathSurgeList', { deep: true, immediate: true })
-	onGroupPathSurgeListChanged(newVal: ITyGroupPathSurge[], oldVal: ITyGroupPathSurge[]) {
-		if (newVal.length > 0 && newVal[0].surge_list.length === 0) {
-			this.$log.warn('groupPathSurgeList 中的 surge_list 为空，无法初始化图表。')
-			return
-		}
-		const xList = newVal[0].surge_list.map((item) => {
-			return new Date(item.forecast_ts * MS_UNIT)
-		})
-		const yList = newVal.map((item) => {
-			return {
-				yList: item.surge_list.map((val) => val.surge),
-				fieldName: getTyGroupEnumName(item.group_type),
+	// @Watch('groupPathSurgeList', { deep: true, immediate: true })
+	// onGroupPathSurgeListChanged(newVal: ITyGroupPathSurge[], oldVal: ITyGroupPathSurge[]) {
+	@Watch('isFinished', { deep: true, immediate: true })
+	todp(val: boolean, oldVal: boolean) {
+		if (val === true) {
+			this.isLoading = false
+			const groupPathSurgeList = this.groupPathSurgeList
+			if (groupPathSurgeList.length > 0 && groupPathSurgeList[0].surge_list.length === 0) {
+				this.$log.warn('groupPathSurgeList 中的 surge_list 为空，无法初始化图表。')
+				return
 			}
-		})
-		// 每次 prop 一有新值就 init 图表
-		this.initCharts(
-			xList,
-			yList,
-			{ fieldName: DEFAULT_TY_NAME_CH, vals: [] },
-			'集合路径潮位预报',
-			0
-		)
+			const xList = groupPathSurgeList[0].surge_list.map((item) => {
+				return new Date(item.forecast_ts * MS_UNIT)
+			})
+			let yList = groupPathSurgeList.map((item) => {
+				return {
+					yList: item.surge_list.map((val) => val.surge),
+					fieldName: getTyGroupEnumName(item.group_type),
+				}
+			})
+			// 获取天文潮位数据
+			const tideList = this.tideList.map((item) => item.tide)
+			yList.push({
+				yList: tideList,
+				fieldName: '天文潮',
+			})
+			// 每次 prop 一有新值就 init 图表
+			this.initCharts(
+				xList,
+				yList,
+				{ fieldName: DEFAULT_TY_NAME_CH, vals: [] },
+				'集合路径潮位预报',
+				0
+			)
+		} else {
+			this.isLoading = true
+		}
 	}
 
 	/** TODO:[-] 24-12-09
