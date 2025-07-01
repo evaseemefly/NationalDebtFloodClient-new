@@ -148,6 +148,8 @@ export default class StationGroupSurgeChartView extends Vue {
 	yAxisMin = 0
 	yAxisMax = 0
 
+	VAL_PADDING = 20
+
 	chartTitle = 'xxx站潮位'
 	chartSubTitle = '--'
 
@@ -159,6 +161,10 @@ export default class StationGroupSurgeChartView extends Vue {
 		['左侧路径', '左侧路径'],
 		['天文潮', '天文潮'],
 	])
+
+	/** 是否要将天文潮与增水进行叠加 */
+	@Prop({ type: Boolean, default: false })
+	readonly isAddition: boolean
 
 	@Prop({ type: Boolean, default: false })
 	readonly isFinished: boolean
@@ -182,19 +188,49 @@ export default class StationGroupSurgeChartView extends Vue {
 	// 监听 prop 变化
 	// @Watch('groupPathSurgeList', { deep: true, immediate: true })
 	// onGroupPathSurgeListChanged(newVal: ITyGroupPathSurge[], oldVal: ITyGroupPathSurge[]) {
-	@Watch('isFinished', { deep: true, immediate: true })
-	todp(val: boolean, oldVal: boolean) {
-		if (val === true) {
+	get paramsOpts(): { isFinished: boolean; isAddition: boolean } {
+		const { isFinished, isAddition } = this
+		return { isFinished, isAddition }
+	}
+
+	@Watch('paramsOpts', { deep: true, immediate: true })
+	todo(
+		val: { isFinished: boolean; isAddition: boolean },
+		oldVal: { isFinished: boolean; isAddition: boolean }
+	) {
+		if (val.isFinished === true) {
 			this.isLoading = false
 			const groupPathSurgeList = this.groupPathSurgeList
-			if (groupPathSurgeList.length > 0 && groupPathSurgeList[0].surge_list.length === 0) {
+			// + 25-07-01 根据 addition prop 决定是否对数据进行叠加处理
+			/** 处理后的集合预报增水集合 */
+			let processedGroupPathSurgeList = groupPathSurgeList
+			if (val.isAddition) {
+				if (val.isAddition) {
+					// 深拷贝并对 surge 值进行叠加
+					processedGroupPathSurgeList = this.groupPathSurgeList.map((path) => ({
+						...path,
+						surge_list: path.surge_list.map((surgeItem, index) => {
+							// 假设 tideList 与 surge_list 按索引对齐
+							const tideValue = this.tideList[index] ? this.tideList[index].tide : 0
+							return {
+								...surgeItem,
+								surge: surgeItem.surge + tideValue,
+							}
+						}),
+					}))
+				}
+			}
+			if (
+				processedGroupPathSurgeList.length > 0 &&
+				processedGroupPathSurgeList[0].surge_list.length === 0
+			) {
 				this.$log.warn('groupPathSurgeList 中的 surge_list 为空，无法初始化图表。')
 				return
 			}
-			const xList = groupPathSurgeList[0].surge_list.map((item) => {
+			const xList = processedGroupPathSurgeList[0].surge_list.map((item) => {
 				return new Date(item.forecast_ts * MS_UNIT)
 			})
-			let yList = groupPathSurgeList.map((item) => {
+			let yList = processedGroupPathSurgeList.map((item) => {
 				return {
 					yList: item.surge_list.map((val) => val.surge),
 					fieldName: getTyGroupEnumName(item.group_type),
@@ -206,14 +242,10 @@ export default class StationGroupSurgeChartView extends Vue {
 				yList: tideList,
 				fieldName: '天文潮',
 			})
+			// + 25-07-01 根据 addition 状态动态设置标题
+			const title = val.isAddition ? '集合路径总潮位预报' : '集合路径增水预报'
 			// 每次 prop 一有新值就 init 图表
-			this.initCharts(
-				xList,
-				yList,
-				{ fieldName: DEFAULT_TY_NAME_CH, vals: [] },
-				'集合路径潮位预报',
-				0
-			)
+			this.initCharts(xList, yList, { fieldName: DEFAULT_TY_NAME_CH, vals: [] }, title, 0)
 		} else {
 			this.isLoading = true
 		}
@@ -282,8 +314,8 @@ export default class StationGroupSurgeChartView extends Vue {
 		const nodeDiv = document.getElementById('surge_scalar_chart')
 		// TODO:[-] 25-06-25 根据传入的yVal 设置极值
 		const allNums = yVals.flatMap((item) => item.yList)
-		that.yAxisMax = Math.max(...allNums)
-		that.yAxisMin = Math.min(...allNums)
+		that.yAxisMax = Math.max(...allNums) + this.VAL_PADDING
+		that.yAxisMin = Math.min(...allNums) - this.VAL_PADDING
 		if (nodeDiv) {
 			const myChart: echarts.ECharts = echarts.init(nodeDiv)
 			let legendData: {

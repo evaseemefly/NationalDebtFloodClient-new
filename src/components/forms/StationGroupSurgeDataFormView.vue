@@ -6,12 +6,17 @@
 	<div v-draggable id="station_surge_form" v-if="getIsShow" class="right-station-surge-form">
 		<div class="my-detail-form">
 			<div class="detail-content">
+				<div class="">
+					<el-switch v-model="isAddition" active-text="总潮位" inactive-text="集合增水">
+					</el-switch>
+				</div>
 				<!-- TODO:[-] 25-06-26 由 DataFormView 组件中获取 groupPathSurgeList 数据 -->
 				<StationGroupSurgeChartView
 					:groupPathSurgeList="groupPathSurgeList"
 					:tideList="tideList"
 					:stationCode="getStationCode"
 					:isFinished="isFinished"
+					:isAddition="isAddition"
 				></StationGroupSurgeChartView>
 			</div>
 		</div>
@@ -42,6 +47,8 @@ export default class StationGroupSurgeDataFormView extends Vue {
 	tideList: ITide[] = []
 
 	isFinished = false
+
+	isAddition = false
 
 	/** + 25-06-30 加载指定站点的增水全集合(增水集合+天文潮集合) */
 	async loadTargetStationSurgeList(
