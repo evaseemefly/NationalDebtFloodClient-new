@@ -66,24 +66,8 @@ import { TaskStatusEnum } from '@/enum/status'
 
 import GroupSurgeTableView from '@/components/table/groupSurgeTableView.vue'
 
-// store
-import {
-	GET_CURRENT_FORECAST_DT,
-	GET_GLOBAL_SURGE_ISSUE_TS,
-	GET_ISSUE_TS,
-	GET_STATION_CODE,
-	GET_SURGE_TD_STEP,
-	GET_TARGET_POSITION_LATLNG,
-	GET_TIMESPAN,
-	GET_TYPHOON_CODE,
-	GET_WAVE_PRODUCT_ISSUE_DATETIME,
-} from '@/store/types'
 //
 // api
-import { loadTargetStationSurgeRealdataList, loadTargetStationTideRealdataList } from '@/api/surge'
-import { loadTargetPositionSurgeForecastdataList } from '@/api/coverage'
-import { loadTargetStationGroupSurgeList } from '@/api/station'
-import { loadStaionRegionCountry, loadStationStaus } from '@/api/station'
 // 工具方法
 // filter
 import {
@@ -94,12 +78,6 @@ import {
 	formatSurge2Str,
 	formatSurgeFixed2Str,
 } from '@/util/filter'
-import moment from 'moment'
-import { MenuType } from '@/enum/menu'
-import station from '@/store/modules/station'
-import { TO_LOAD_FORECASTDATALIST_COORDS } from '@/bus/types'
-import { EventBus } from '@/bus/BUS'
-import { LayerTypeEnum } from '@/enum/map'
 
 import { loadWaveProductForecastRealDataList } from '@/api/wave'
 import { filter } from 'vue/types/umd'
@@ -112,6 +90,9 @@ import { getTyGroupEnumName } from '@/enum/typhoon'
 const MARGIN_TOP = 20
 const MARGIN_BOTTOM = 20
 
+/**
+ * 集合预报增水 chart 组件
+ */
 @Component({
 	filters: {
 		filterProductTypeName,
@@ -132,18 +113,6 @@ export default class StationGroupSurgeChartView extends Vue {
 
 	/** 当前的图表charts对象(唯一) */
 	myChart: echarts.ECharts = null
-
-	/** 预报时间列表 */
-	forecastDtList: Date[] = []
-	dtList: Date[] = []
-	/** 实况潮位 */
-	surgeList: number[] = []
-	/** 实况潮位-天文潮 */
-	diffSurgeList: number[] = []
-	/** 预报值列表 */
-	forecastValList: number[] = []
-	/** 预报时间戳集合 */
-	forecastTsList: number[] = []
 
 	yAxisMin = 0
 	yAxisMax = 0
@@ -166,15 +135,19 @@ export default class StationGroupSurgeChartView extends Vue {
 	@Prop({ type: Boolean, default: false })
 	readonly isAddition: boolean
 
+	/** 所有api加载完毕 */
 	@Prop({ type: Boolean, default: false })
 	readonly isFinished: boolean
 
+	/** 集合路径对应增水集合 */
 	@Prop({ type: Array, default: () => [] })
 	readonly groupPathSurgeList: ITyGroupPathSurge[]
 
+	/** 天文潮集合 */
 	@Prop({ type: Array, default: () => [] })
 	readonly tideList: ITide[]
 
+	/** 站点code */
 	@Prop({ type: String, default: DEFAULT_STATION_CODE })
 	readonly stationCode: string
 
@@ -183,11 +156,7 @@ export default class StationGroupSurgeChartView extends Vue {
 	/** 鼠标移入 chart 中的 index */
 	hoverDtIndex = 0
 
-	created() {}
-
 	// 监听 prop 变化
-	// @Watch('groupPathSurgeList', { deep: true, immediate: true })
-	// onGroupPathSurgeListChanged(newVal: ITyGroupPathSurge[], oldVal: ITyGroupPathSurge[]) {
 	get paramsOpts(): { isFinished: boolean; isAddition: boolean } {
 		const { isFinished, isAddition } = this
 		return { isFinished, isAddition }
@@ -208,12 +177,18 @@ export default class StationGroupSurgeChartView extends Vue {
 				if (val.isAddition) {
 					// 深拷贝并对 surge 值进行叠加
 					processedGroupPathSurgeList = this.groupPathSurgeList.map((path) => ({
-						...path,
+						// TODO:[-] 25-07-01 注意此处使用了属性展开语法
+						/**
+						 * 1- 创建一个新的空对象 {}。
+						   2- 将 path 对象中所有可枚举的自有属性（在这里是 group_type 和 surge_list）复制到这个新对象中。
+						   3- 定义新的 surge_list 覆盖原始对象中的 surge_list 字段
+						 */
+						...path, // ITyGroupPathSurge 中除了surge_list变量其余不变
 						surge_list: path.surge_list.map((surgeItem, index) => {
 							// 假设 tideList 与 surge_list 按索引对齐
 							const tideValue = this.tideList[index] ? this.tideList[index].tide : 0
 							return {
-								...surgeItem,
+								...surgeItem, // ISurgeItem中除了 surge 变量其他变量不变
 								surge: surgeItem.surge + tideValue,
 							}
 						}),
@@ -251,58 +226,7 @@ export default class StationGroupSurgeChartView extends Vue {
 		}
 	}
 
-	/** TODO:[-] 24-12-09
-	 * 将 预报 与 实况数据按照时间进行合并并返回
-	 * TODO:[*] 24-12-12 传入的 tideList 为 169 转换后返回为 96有值，后面无值
-	 */
-	unifyData(
-		dtList: Date[],
-		tideDtList: Date[],
-		surgeList: number[],
-		tideList: number[],
-		diffSurgeList: number[],
-		forecastTs: number[],
-		forecastVals: number[]
-	) {
-		// 1. 将 dtList 转换为时间戳数组
-		const dtTimestamps = dtList.map((date) => date.getTime())
-
-		const tideDtTimestamps = tideDtList.map((date) => date.getTime())
-
-		// 2. 合并时间戳数组并去重排序
-		const mergedTimestamps = Array.from(
-			new Set([...dtTimestamps, ...tideDtTimestamps, ...forecastTs])
-		).sort((a, b) => a - b)
-
-		// 3. 创建对齐后的实况数据和预报数据数组
-		const alignedSurgeList = mergedTimestamps.map((timestamp) =>
-			dtTimestamps.includes(timestamp) ? surgeList[dtTimestamps.indexOf(timestamp)] : null
-		)
-
-		const alignedTideList = mergedTimestamps.map((timestamp) =>
-			tideDtTimestamps.includes(timestamp)
-				? tideList[tideDtTimestamps.indexOf(timestamp)]
-				: null
-		)
-
-		const alignedDiffSurgeList = mergedTimestamps.map((timestamp) =>
-			dtTimestamps.includes(timestamp) ? diffSurgeList[dtTimestamps.indexOf(timestamp)] : null
-		)
-
-		const alignedForecastSurgeList = mergedTimestamps.map((timestamp) =>
-			forecastTs.includes(timestamp) ? forecastVals[forecastTs.indexOf(timestamp)] : null
-		)
-
-		// 4. 返回结果
-		return {
-			mergedTimestamps,
-			alignedSurgeList,
-			alignedTideList,
-			alignedDiffSurgeList,
-			alignedForecastSurgeList,
-		}
-	}
-
+	/** 根据数据加载 charts */
 	initCharts(
 		xList: Date[],
 		yVals: { yList: number[]; fieldName: string }[],
@@ -568,7 +492,62 @@ export default class StationGroupSurgeChartView extends Vue {
 		}
 	}
 
-	/** 判断chart 选项中参数是否符合标准规范 */
+	/**
+	 * 将 预报 与 实况数据按照时间进行合并并返回
+	 * 24-12-12 传入的 tideList 为 169 转换后返回为 96有值，后面无值
+	 * @delayed
+	 */
+	unifyData(
+		dtList: Date[],
+		tideDtList: Date[],
+		surgeList: number[],
+		tideList: number[],
+		diffSurgeList: number[],
+		forecastTs: number[],
+		forecastVals: number[]
+	) {
+		// 1. 将 dtList 转换为时间戳数组
+		const dtTimestamps = dtList.map((date) => date.getTime())
+
+		const tideDtTimestamps = tideDtList.map((date) => date.getTime())
+
+		// 2. 合并时间戳数组并去重排序
+		const mergedTimestamps = Array.from(
+			new Set([...dtTimestamps, ...tideDtTimestamps, ...forecastTs])
+		).sort((a, b) => a - b)
+
+		// 3. 创建对齐后的实况数据和预报数据数组
+		const alignedSurgeList = mergedTimestamps.map((timestamp) =>
+			dtTimestamps.includes(timestamp) ? surgeList[dtTimestamps.indexOf(timestamp)] : null
+		)
+
+		const alignedTideList = mergedTimestamps.map((timestamp) =>
+			tideDtTimestamps.includes(timestamp)
+				? tideList[tideDtTimestamps.indexOf(timestamp)]
+				: null
+		)
+
+		const alignedDiffSurgeList = mergedTimestamps.map((timestamp) =>
+			dtTimestamps.includes(timestamp) ? diffSurgeList[dtTimestamps.indexOf(timestamp)] : null
+		)
+
+		const alignedForecastSurgeList = mergedTimestamps.map((timestamp) =>
+			forecastTs.includes(timestamp) ? forecastVals[forecastTs.indexOf(timestamp)] : null
+		)
+
+		// 4. 返回结果
+		return {
+			mergedTimestamps,
+			alignedSurgeList,
+			alignedTideList,
+			alignedDiffSurgeList,
+			alignedForecastSurgeList,
+		}
+	}
+
+	/** 判断chart 选项中参数是否符合标准规范
+	 * @delayed
+	 */
 	checkChartOptsStandards(stationCode: string, tyCode: string, issueTs: number) {
 		let isStandard = false
 		if (

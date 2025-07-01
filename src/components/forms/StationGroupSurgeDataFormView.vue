@@ -1,8 +1,4 @@
 <template>
-	<!-- <transition
-		enter-active-class="animate__animated animate__fadeIn"
-		leave-active-class="animate__animated animate__fadeOut"
-	> -->
 	<div v-draggable id="station_surge_form" v-if="getIsShow" class="right-station-surge-form">
 		<div class="my-detail-form">
 			<div class="detail-content">
@@ -21,7 +17,6 @@
 			</div>
 		</div>
 	</div>
-	<!-- </transition> -->
 </template>
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from 'vue-property-decorator'
@@ -36,6 +31,10 @@ import consola from 'consola'
 import { IHttpResponse } from '@/interface/common'
 import { ITide, ITyGroupPathSurge } from '@/interface/surge'
 import { TyphoonGroupTypeEnum } from '@/enum/typhoon'
+
+/**
+ * 站点集合预报增水 form 组件——其中嵌套 StationGroupSurgeChartView 子组件
+ */
 @Component({ components: { StationGroupSurgeChartView } })
 export default class StationGroupSurgeDataFormView extends Vue {
 	mounted() {}
@@ -46,8 +45,10 @@ export default class StationGroupSurgeDataFormView extends Vue {
 	/** 天文潮预报集合 */
 	tideList: ITide[] = []
 
+	/** 所有api加载完毕 */
 	isFinished = false
 
+	/** 是否显示总潮位 */
 	isAddition = false
 
 	/** + 25-06-30 加载指定站点的增水全集合(增水集合+天文潮集合) */
@@ -108,6 +109,9 @@ export default class StationGroupSurgeDataFormView extends Vue {
 		}
 	}
 
+	/** @delayed
+	 * 加载指定站点的集合增水集合
+	 */
 	async loadTargetStationGroupSurgeList(stationCode: string, tyCode: string, issueTs: number) {
 		loadTargetStationGroupSurgeList(stationCode, tyCode, issueTs)
 			.then((res: IHttpResponse<ITyGroupPathSurge[]>) => {
@@ -169,6 +173,7 @@ export default class StationGroupSurgeDataFormView extends Vue {
 	@Getter(GET_STATION_CODE, { namespace: 'station' })
 	getStationCode: string
 
+	/** 台风集合摘要和选中站点 */
 	get tySource(): {
 		typhoon: ITyGroupTip | null
 		stationCode: string
@@ -206,12 +211,7 @@ export default class StationGroupSurgeDataFormView extends Vue {
 			console.log(
 				`Typhoon or Station Code changed:stationCode:${newVal.stationCode}, tyCode:${newVal.typhoon.tyCode}, timeStamp:${newVal.typhoon.timeStamp}`
 			)
-			// 调用api获取该站点的增水集合
-			// this.loadTargetStationGroupSurgeList(
-			// 	newVal.stationCode,
-			// 	newVal.typhoon.tyCode,
-			// 	newVal.typhoon.timeStamp
-			// )
+
 			this.loadTargetStationSurgeList(
 				newVal.stationCode,
 				newVal.typhoon.tyCode,

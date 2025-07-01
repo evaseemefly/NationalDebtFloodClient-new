@@ -1,21 +1,15 @@
 <template>
 	<div class="home">
 		<div class="layout-top">
-			<!-- <div class="layout-left"><MainNavMenuView></MainNavMenuView></div> -->
 			<div class="layout-right"><FloodForecastMap></FloodForecastMap></div>
 		</div>
 		<div class="layout-bottom">
 			<SubNavGlobalForecastMenuView></SubNavGlobalForecastMenuView>
 		</div>
-		<!-- <WaveGridForecastDataFormView></WaveGridForecastDataFormView> -->
 		<StationGroupSurgeDataFormView></StationGroupSurgeDataFormView>
-		<!-- <div><StationTideFormView></StationTideFormView></div> -->
-		<!-- <StationLayoutView :tyNum="tyNum"></StationLayoutView> -->
-		<!-- <StationExtremumListView :tyNum="tyNum"></StationExtremumListView> -->
-		<!-- <ThumbListView></ThumbListView> -->
+
 		<HeaderLogoView title="广东省漫滩淹没预警系统"></HeaderLogoView>
 		<LegendListView></LegendListView>
-		<!-- <RegionStatisticsCard></RegionStatisticsCard> -->
 		<TySearchFormView></TySearchFormView>
 		<tyGroupPathFilterForm></tyGroupPathFilterForm>
 	</div>
