@@ -2,7 +2,8 @@
 // home 5820
 // 全球预报监测
 // export const host = 'http://172.16.30.163:92'
-export const host = 'http://128.5.10.21:92'
+// export const host = 'http://128.5.10.21:92'
+export const host = 'http://localhost:92'
 
 /** @type {*} 21-03-05 + 新添加的用来加载 geoserver的host */
 // export const hostGeo = 'http://128.5.10.21:8082/geoserver/'
